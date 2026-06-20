@@ -117,12 +117,7 @@
         }
     </style>
     
-    <script type="module">
-        import { h, Component, render, Fragment, createRef } from 'https://esm.sh/preact@10.15.1';
-        import htm from 'https://esm.sh/htm@3.1.1';
-
-        const html = htm.bind(h);
-
+    <script>
         const COLOR_INDICES = {
             'COLOR_DEFAULT': 0x1,
             'COLOR_REGCMT': 0x2,
@@ -321,6 +316,62 @@
             root.style.setProperty(`--${name}`, `#${color}`);
         }
 
+        function appendChild(parent, child) {
+            if (child === null || child === undefined || child === false) {
+                return;
+            }
+
+            if (Array.isArray(child)) {
+                child.forEach(item => appendChild(parent, item));
+                return;
+            }
+
+            if (child instanceof Node) {
+                parent.appendChild(child);
+                return;
+            }
+
+            parent.appendChild(document.createTextNode(String(child)));
+        }
+
+        function createElement(tag, attributes = {}, children = []) {
+            const element = document.createElement(tag);
+
+            for (const [name, value] of Object.entries(attributes)) {
+                if (value === null || value === undefined || value === false) {
+                    continue;
+                }
+
+                if (name === "className") {
+                    element.className = value;
+                } else if (name === "style" && typeof value === "object") {
+                    Object.assign(element.style, value);
+                } else if (name === "textContent") {
+                    element.textContent = value;
+                } else {
+                    element.setAttribute(name, value);
+                }
+            }
+
+            appendChild(element, children);
+            return element;
+        }
+
+        function createSvgElement(tag, attributes = {}, children = []) {
+            const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
+
+            for (const [name, value] of Object.entries(attributes)) {
+                if (value === null || value === undefined || value === false) {
+                    continue;
+                }
+
+                element.setAttribute(name, value);
+            }
+
+            appendChild(element, children);
+            return element;
+        }
+
         // parse the sequence of IDA color tokens into a tree.
         // nodes in the tree look like:
         //   - type: string = "string" | "color" | "address"
@@ -389,27 +440,39 @@
             }
         }
 
-        function renderTokens(node, prefix_color) {
+        function getCssColor(color_name) {
+            if (!Object.prototype.hasOwnProperty.call(COLOR_INDICES, color_name)) {
+                return "";
+            }
+
+            return `var(--${color_name})`;
+        }
+
+        function renderTokens(node, prefix_color_name) {
             if (node.type === "string") {
-                return html`<span>${node.string}</span>`;
+                return createElement("span", {textContent: node.string});
             } else if (node.type === "root") {
-                const children = node.children.map(renderTokens);
-                return html`<${Fragment} children=${children}></${Fragment}>`;
+                const fragment = document.createDocumentFragment();
+                appendChild(fragment, node.children.map(child => renderTokens(child, prefix_color_name)));
+                return fragment;
             } else if (node.type === "color" && node.color == "COLOR_PREFIX") {
-                const children = node.children.map(renderTokens);
-                return html`<span style="color: #${prefix_color}" children=${children}></span>`;
+                const children = node.children.map(child => renderTokens(child, prefix_color_name));
+                return createElement("span", {style: {color: getCssColor(prefix_color_name)}}, children);
             } else if (node.type === "color") {
-                const children = node.children.map(renderTokens);
-                return html`<span style="color: var(--${node.color})" children=${children}></span>`;
+                const children = node.children.map(child => renderTokens(child, prefix_color_name));
+                return createElement("span", {style: {color: `var(--${node.color})`}}, children);
             } else if (node.type === "address") {
-                return html`<a href="#${node.address}" class="token-address"><span>${node.string}</span></a>`;
+                return createElement("a", {
+                    href: `#${node.address}`,
+                    className: "token-address",
+                }, createElement("span", {textContent: node.string}));
             } else {
                 console.error("unexpected", node);
             }
         }
 
-        function DisassemblyLine(props) {
-            const tokens = [...props.line.tokens];
+        function renderDisassemblyLine(line) {
+            const tokens = [...line.tokens];
 
             const root = {
                 "type": "root",
@@ -420,205 +483,219 @@
 
             // TODO: bg color, broken.
 
-            return html`
-                <p class="disassembly-line">
-                    <pre>
-                        ${renderTokens(root, props.line.prefix_color)}
-                    </pre>
-                </p>
-            `;
+            const pre = createElement("pre", {}, renderTokens(root, line.prefix_color_name));
+            return createElement("p", {className: "disassembly-line"}, pre);
         }
 
-        function Location(props) {
-            return html`
-                <div class="location">
-                    <span id=${props.location.address} class="anchor"></span>
-                    ${props.location.lines.map(line => html`<${DisassemblyLine} line=${line} />`)}
-                </div>
-            `;
+        function renderLocation(location) {
+            const children = [
+                createElement("span", {
+                    id: location.address,
+                    className: "anchor",
+                }),
+                location.lines.map(renderDisassemblyLine),
+            ];
+
+            return createElement("div", {className: "location"}, children);
         }
 
-        function BasicBlock(props) {
-            let {top, left, bottom, right} = props.basic_block.rect;
+        function renderBasicBlock(basic_block) {
+            let {top, left, bottom, right} = basic_block.rect;
             let height = bottom - top;
             let width = right - left;
 
-            return html`
-                <div 
-                    class="basic-block" 
-                    style="
-                        top: ${top}px;
-                        left: ${left}px; 
-                        height: ${height}px;
-                        width: ${width}px;
-                    ">
-                    <div class="basic-block-header"></div>
-                    ${props.basic_block.locations.map(location => html`<${Location} location=${location} />`)}
-                </div>
-            `;
+            const children = [
+                createElement("div", {className: "basic-block-header"}),
+                basic_block.locations.map(renderLocation),
+            ];
+
+            return createElement("div", {
+                className: "basic-block",
+                style: {
+                    top: `${top}px`,
+                    left: `${left}px`,
+                    height: `${height}px`,
+                    width: `${width}px`,
+                },
+            }, children);
         }
 
-        function Edge(props) {
-            const points = props.edge.points.map(point => `${point.x},${point.y}`).join(" ");
+        function renderEdge(edge) {
+            const points = edge.points.map(point => `${point.x},${point.y}`).join(" ");
 
             // TODO: edge color, broken.
 
             // TODO: edge arrow
 
-            return html`
-                <svg class="edge-line">
-                    <polyline points="${points}"></polyline>
-                </svg>
-            `;
+            return createSvgElement("svg", {class: "edge-line"}, [
+                createSvgElement("polyline", {points}),
+            ]);
         }
 
-        class Pannable extends Component {
-            foreground_ref = createRef();
-            background_ref = createRef();
+        function setupPannable(background, foreground) {
+            // via: https://codepen.io/loxks/details/KKpVvVW
+            let isDown = false;
 
-            render() {
-                return html`
-                    <div ref=${this.background_ref} class="pannable-background" style="width: 100%; height: 100%;">
-                        <div ref=${this.foreground_ref} class="pannable-foreground" style="width: 100%; height: 100%;">
-                            ${this.props.children}
-                        </div>
-                    </div>
-                `;
+            // the position of the cursor at the start of a drag.
+            let startX = 0;
+            let startY = 0;
+
+            // the position of the foreground at the start of a drag.
+            // this is updated when a drag completes.
+            let x = 0;
+            let y = 0;
+
+            let velX = 0;
+            let velY = 0;
+
+            // the position of the cursor at the last mousemove event
+            let lastX = 0;
+            let lastY = 0;
+
+            // TODO: enable scrolling
+            // TODO: enable touch interactions
+
+            background.addEventListener("mousedown", (e) => {
+                isDown = true;
+                background.classList.add("active");
+                background.style.userSelect = "none";
+                // TODO: style: set cursor: grabbing
+
+                startX = e.pageX;
+                startY = e.pageY;
+                lastX = e.pageX;
+                lastY = e.pageY;
+                cancelMomentumTracking();
+            });
+
+            const finish_drag = (e) => {
+                if (!isDown) {
+                    return;
+                }
+
+                isDown = false;
+                background.classList.remove("active");
+
+                const dx = e.pageX - startX;
+                const dy = e.pageY - startY;
+
+                y = y + dy;
+                x = x + dx;
+            };
+
+            background.addEventListener("mouseleave", (e) => {
+                if (!isDown) {
+                    return;
+                }
+
+                finish_drag(e);
+                beginMomentumTracking();
+            });
+
+            background.addEventListener("mouseup", (e) => {
+                finish_drag(e);
+                beginMomentumTracking();
+            });
+
+            background.addEventListener("mousemove", (e) => {
+                if (!isDown) {
+                    return;
+                }
+                e.preventDefault();
+
+                const dx = e.pageX - startX;
+                const dy = e.pageY - startY;
+
+                foreground.style.transform = `translateX(${x + dx}px) translateY(${y + dy}px)`;
+
+                velX = e.pageX - lastX;
+                velY = e.pageY - lastY;
+
+                lastX = e.pageX;
+                lastY = e.pageY;
+            });
+
+            // Momentum
+
+            let momentumID = 0;
+            function beginMomentumTracking() {
+                cancelMomentumTracking();
+                momentumID = requestAnimationFrame(momentumLoop);
             }
 
-            componentDidMount() {
-                // via: https://codepen.io/loxks/details/KKpVvVW
-                let isDown = false;
+            function cancelMomentumTracking() {
+                cancelAnimationFrame(momentumID);
+            }
 
-                // the position of the cursor at the start of a drag.
-                let startX = 0;
-                let startY = 0;
+            const momentumLoop = () => {
+                x += velX;
+                y += velY;
 
-                // the position of the foreground at the start of a drag.
-                // this is updated when a drag completes.
-                let x = 0;
-                let y = 0;
+                foreground.style.transform = `translateX(${x}px) translateY(${y}px)`;
 
-                let velX = 0;
-                let velY = 0;
+                velX *= 0.9;
+                velY *= 0.9;
 
-                // TODO: enable scrolling
-                // TODO: enable touch interactions
-
-                this.background_ref.current.addEventListener("mousedown", (e) => {
-                    isDown = true;
-                    this.background_ref.current.classList.add("active");
-                    this.background_ref.current.style.userSelect = "none";
-                    // TODO: style: set cursor: grabbing
-
-                    startX = e.pageX;
-                    startY = e.pageY;
-                    cancelMomentumTracking();
-                });
-
-                const finish_drag = (e) => {
-                    isDown = false;
-                    this.background_ref.current.classList.remove("active");
-
-                    const dx = e.pageX - startX;
-                    const dy = e.pageY - startY;
-
-                    y = y + dy;
-                    x = x + dx;
-                };
-
-                this.background_ref.current.addEventListener("mouseleave", (e) => {
-                    if (!isDown) {
-                        return;
-                    }
-
-                    finish_drag(e);
-                    beginMomentumTracking();
-                });
-
-                this.background_ref.current.addEventListener("mouseup", (e) => {
-                    finish_drag(e);
-                    beginMomentumTracking();
-                });
-
-                // the position of the cursor at the last mousemove event
-                let lastX = 0;
-                let lastY = 0;
-
-                this.background_ref.current.addEventListener("mousemove", (e) => {
-                    if (!isDown) {
-                        return;
-                    }
-                    e.preventDefault();
-
-                    const dx = e.pageX - startX;
-                    const dy = e.pageY - startY;
-
-                    this.foreground_ref.current.style.transform = `translateX(${x + dx}px) translateY(${y + dy}px)`;
-
-                    velX = e.pageX - lastX;
-                    velY = e.pageY - lastY;
-
-                    lastX = e.pageX;
-                    lastY = e.pageY;
-                });
-
-                // Momentum
-
-                let momentumID = 0;
-                function beginMomentumTracking() {
-                    cancelMomentumTracking();
+                if (Math.abs(velX) > 0.5 || Math.abs(velY) > 0.5) {
                     momentumID = requestAnimationFrame(momentumLoop);
                 }
-
-                function cancelMomentumTracking() {
-                    cancelAnimationFrame(momentumID);
-                }
-
-                const momentumLoop = () => {
-                    x += velX;
-                    y += velY;
-
-                    this.foreground_ref.current.style.transform = `translateX(${x}px) translateY(${y}px)`;
-
-                    velX *= 0.9;
-                    velY *= 0.9;
-
-                    if (Math.abs(velX) > 0.5 || Math.abs(velY) > 0.5) {
-                        momentumID = requestAnimationFrame(momentumLoop);
-                    }
-                };
-            }
-
-            componentWillUnmount() {
-                // TODO: detach handlers
-            }
+            };
         }
 
+        function createPannable(children) {
+            const foreground = createElement("div", {
+                className: "pannable-foreground",
+                style: {
+                    width: "100%",
+                    height: "100%",
+                },
+            }, children);
 
-        function Graph(props) {
-            return html`
-                <div class="graph" style="height: 100%; width: 100%;">
-                    <${Pannable}>
-                        <!-- order of these elements is important, because they draw on top of each other, due to fixed layout -->
+            const background = createElement("div", {
+                className: "pannable-background",
+                style: {
+                    width: "100%",
+                    height: "100%",
+                },
+            }, foreground);
 
-                        <!-- this is just a large element for the mouse to grab. assume 10k pixels is big enough :-) -->
-                        <div style="height: 10000px; width: 10000px; position: fixed; top: -5000px; left: -5000px;" />
-
-                        ${props.graph.edges.map(edge => html`<${Edge} edge=${edge} />`)}
-
-                        ${props.graph.basic_blocks.map(basic_block => html`<${BasicBlock} basic_block=${basic_block} />`)}
-                    </${Pannable}>
-                </div>
-            `;
+            setupPannable(background, foreground);
+            return background;
         }
 
-        function App (props) {
-            return html`
-                <${Fragment}>
-                    <${Graph} graph=${props.graph} />
-                </${Fragment}>
-            `;
+        function renderGraph(graph) {
+            const children = [
+                // order of these elements is important, because they draw on top of each other, due to fixed layout
+
+                // this is just a large element for the mouse to grab. assume 10k pixels is big enough :-)
+                createElement("div", {
+                    style: {
+                        height: "10000px",
+                        width: "10000px",
+                        position: "fixed",
+                        top: "-5000px",
+                        left: "-5000px",
+                    },
+                }),
+
+                graph.edges.map(renderEdge),
+
+                graph.basic_blocks.map(renderBasicBlock),
+            ];
+
+            return createElement("div", {
+                className: "graph",
+                style: {
+                    height: "100%",
+                    width: "100%",
+                },
+            }, createPannable(children));
+        }
+
+        function renderApp(graph) {
+            const fragment = document.createDocumentFragment();
+            fragment.appendChild(renderGraph(graph));
+            return fragment;
         }
 
         function needsFontResize() {
@@ -3018,12 +3095,13 @@
     }
   ],
   "sha256": "131314a6f6d1d263c75b9909586b3e1bd837036329ace5e69241749e861ac01d"
-};
+};;;;
 
             console.log(data);
             document.title = `${data.sha256}: ${data.address}`;
 
-            render(html`<${App} graph=${data} />`, document.body);
+            document.body.textContent = "";
+            document.body.appendChild(renderApp(data));
 
             // these are a huge hack, but they do make the layout much more precise
             // even when using different fonts.
@@ -3033,7 +3111,11 @@
             setTimeout(fixupLineHeight, 16);
         }
 
-        main();
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", main);
+        } else {
+            main();
+        }
     </script>
 </head>
 <body>

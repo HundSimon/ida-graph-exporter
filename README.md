@@ -15,9 +15,8 @@ Note that the original project has a more thorough and complete handling of them
 Run the script `export_ida_graph.py` from IDA Pro and select the output path for the HTML file.
 Then, open this file in a web browser, optionally hosting it on a web server.
 
-Unfortunately, the output file is not fully self-contained: this is an artifact of using ES6 modules to load [preact](https://preactjs.com/) and [htm](https://github.com/developit/htm) to help with rendering.
-Therefore, you're not able to view the exported document on an offline machine, such as a malware analysis VM.
-A better solution is to emit a file with all the resources embedded within it; I haven't been able to do this yet.
+The output file is self-contained: the renderer uses vanilla JavaScript and embeds the graph data directly in the HTML.
+This means exported documents can be viewed offline, such as inside a malware analysis VM.
 
 ## Example
 
