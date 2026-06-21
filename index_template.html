@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="color-scheme" content="dark">
+    <meta name="darkreader" content="ignore">
+    <meta name="darkreader-lock" content="true">
     <title>graph</title>
 
     <style>
@@ -59,6 +62,7 @@
     <style>
         body {
             background-color: rgb(176, 176, 176);
+            color-scheme: dark;
             overflow: hidden;
         }
 
@@ -187,9 +191,9 @@
             [DISASM]
             000000	 //
             d8d8d8	 //Default color
-            707070	 //Regular comment
-            707070	 //Repeatable comment
-            707070	 //Automatic comment
+            d8a0d8	 //Regular comment
+            d8a0d8	 //Repeatable comment
+            d8a0d8	 //Automatic comment
             e6e6e6	 //Instruction
             00d2ff	 //Dummy Data Name
             00d2ff	 //Regular Data Name
@@ -212,7 +216,7 @@
             00d2ff	 //Library function name
             b8b866	 //Local variable name
             00d2ff	 //Dummy code name
-            707070	 //Assembler directive
+            00e0a8	 //Assembler directive
             80b0ff	 //Macro
             75d475	 //String constant in data directive
             3a6aff	 //Char constant in data directive
@@ -654,6 +658,7 @@
             updatePosition();
 
             background.addEventListener("mousedown", (e) => {
+                e.preventDefault();
                 isDown = true;
                 background.classList.add("active");
                 background.style.userSelect = "none";
@@ -677,11 +682,10 @@
                 const dx = e.pageX - startX;
                 const dy = e.pageY - startY;
 
-                y = y + dy;
-                x = x + dx;
+                updatePosition(x + dx, y + dy);
             };
 
-            background.addEventListener("mouseleave", (e) => {
+            window.addEventListener("mouseup", (e) => {
                 if (!isDown) {
                     return;
                 }
@@ -690,12 +694,7 @@
                 beginMomentumTracking();
             });
 
-            background.addEventListener("mouseup", (e) => {
-                finish_drag(e);
-                beginMomentumTracking();
-            });
-
-            background.addEventListener("mousemove", (e) => {
+            window.addEventListener("mousemove", (e) => {
                 if (!isDown) {
                     return;
                 }
@@ -787,6 +786,9 @@
             const foreground = createElement("div", {
                 className: "pannable-foreground",
                 style: {
+                    position: "fixed",
+                    top: "0px",
+                    left: "0px",
                     width: "100%",
                     height: "100%",
                 },
@@ -795,8 +797,12 @@
             const background = createElement("div", {
                 className: "pannable-background",
                 style: {
+                    position: "fixed",
+                    top: "0px",
+                    left: "0px",
                     width: "100%",
                     height: "100%",
+                    overflow: "hidden",
                 },
             }, foreground);
 
@@ -829,29 +835,53 @@
             return bounds;
         }
 
+        function addressToBigInt(address) {
+            if (typeof address !== "string") {
+                return null;
+            }
+
+            try {
+                return BigInt(`0x${address}`);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function getEntryBlock(graph) {
+            const entryAddress = addressToBigInt(graph.entry_address || graph.address);
+            if (entryAddress === null) {
+                return graph.basic_blocks[0] || null;
+            }
+
+            return graph.basic_blocks.find(block => {
+                const start = addressToBigInt(block.range.start);
+                const end = addressToBigInt(block.range.end);
+                return start !== null && end !== null && start <= entryAddress && entryAddress < end;
+            }) || graph.basic_blocks[0] || null;
+        }
+
         function getInitialGraphPosition(graph) {
             const padding = 24;
+            const entryBlock = getEntryBlock(graph);
+            if (entryBlock) {
+                const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+                const blockCenter = (entryBlock.rect.left + entryBlock.rect.right) / 2;
+                return {
+                    x: viewportWidth / 2 - blockCenter,
+                    y: padding - entryBlock.rect.top,
+                };
+            }
+
             const bounds = getGraphBounds(graph);
             return {
-                x: Math.max(0, padding - bounds.minX),
-                y: Math.max(0, padding - bounds.minY),
+                x: padding - bounds.minX,
+                y: padding - bounds.minY,
             };
         }
 
         function renderGraph(graph) {
             const children = [
                 // order of these elements is important, because they draw on top of each other, due to fixed layout
-
-                // this is just a large element for the mouse to grab. assume 10k pixels is big enough :-)
-                createElement("div", {
-                    style: {
-                        height: "10000px",
-                        width: "10000px",
-                        position: "fixed",
-                        top: "-5000px",
-                        left: "-5000px",
-                    },
-                }),
 
                 graph.edges.map(renderEdge),
 

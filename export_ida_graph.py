@@ -328,6 +328,7 @@ class Edge:
 class Graph:
     sha256: str
     address: Address
+    entry_address: Address
     name: str
     basic_blocks: List[BasicBlock]
     edges: List[Edge]
@@ -401,6 +402,7 @@ def export_current_graph():
     graph: Graph = Graph(
         sha256=binascii.hexlify(ida_nalt.retrieve_input_file_sha256()).decode("ascii"),
         address=Address.from_int(va),
+        entry_address=Address.from_int(f.start_ea),
         name=ida_name.get_name(f.start_ea) or f"sub_{f.start_ea:X}",
         basic_blocks=[], 
         edges=[]
