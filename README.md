@@ -31,7 +31,5 @@ Note that the rendering is not perfect. Here are the things I'm aware of:
   - a bunch of colored items, due to suspected bug in IDAPython:
     - line background colors
     - node background colors
-    - edge colors
-  - edges don't have arrows
   - font is `monospace`, not exported from IDA
   - graph background/image

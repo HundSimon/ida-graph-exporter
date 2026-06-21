@@ -113,7 +113,10 @@
             fill: none;
             stroke-width: 1;
             stroke-linecap: round;
-            stroke: grey;
+        }
+
+        svg.edge-line polygon {
+            stroke: none;
         }
     </style>
     
@@ -520,19 +523,93 @@
             }, children);
         }
 
+        const EDGE_COLORS = {
+            normal: "#0000ff",
+            true: "#008000",
+            false: "#ff0000",
+        };
+
+        const LEGACY_EDGE_COLOR_TYPES = {
+            0x43: "normal",
+            0x44: "true",
+            0x45: "false",
+        };
+
+        function getLegacyEdgeType(edge) {
+            if (typeof edge.color !== "string") {
+                return null;
+            }
+
+            const color = Number.parseInt(edge.color, 16);
+            if (!Number.isFinite(color)) {
+                return null;
+            }
+
+            return LEGACY_EDGE_COLOR_TYPES[color & 0xff] || null;
+        }
+
+        function getEdgeType(edge) {
+            return edge.edge_type || getLegacyEdgeType(edge) || "normal";
+        }
+
+        function getEdgeColor(edge) {
+            return EDGE_COLORS[getEdgeType(edge)] || EDGE_COLORS.normal;
+        }
+
+        function getArrowPoints(points) {
+            if (points.length < 2) {
+                return "";
+            }
+
+            const end = points[points.length - 1];
+            let start = null;
+            for (let i = points.length - 2; i >= 0; i--) {
+                const point = points[i];
+                if (point.x !== end.x || point.y !== end.y) {
+                    start = point;
+                    break;
+                }
+            }
+
+            if (start === null) {
+                return "";
+            }
+
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const length = Math.hypot(dx, dy);
+            if (length === 0) {
+                return "";
+            }
+
+            const unitX = dx / length;
+            const unitY = dy / length;
+            const arrowLength = 10;
+            const arrowWidth = 8;
+            const baseX = end.x - unitX * arrowLength;
+            const baseY = end.y - unitY * arrowLength;
+            const perpX = -unitY * arrowWidth / 2;
+            const perpY = unitX * arrowWidth / 2;
+
+            return [
+                `${end.x},${end.y}`,
+                `${baseX + perpX},${baseY + perpY}`,
+                `${baseX - perpX},${baseY - perpY}`,
+            ].join(" ");
+        }
+
         function renderEdge(edge) {
             const points = edge.points.map(point => `${point.x},${point.y}`).join(" ");
-
-            // TODO: edge color, broken.
-
-            // TODO: edge arrow
+            const color = getEdgeColor(edge);
+            const arrowPoints = getArrowPoints(edge.points);
 
             return createSvgElement("svg", {class: "edge-line"}, [
-                createSvgElement("polyline", {points}),
+                createSvgElement("polyline", {points, stroke: color}),
+                arrowPoints && createSvgElement("polygon", {points: arrowPoints, fill: color}),
             ]);
         }
 
-        function setupPannable(background, foreground) {
+        function setupPannable(background, foreground, initialPosition = {x: 0, y: 0}) {
             // via: https://codepen.io/loxks/details/KKpVvVW
             let isDown = false;
 
@@ -542,8 +619,8 @@
 
             // the position of the foreground at the start of a drag.
             // this is updated when a drag completes.
-            let x = 0;
-            let y = 0;
+            let x = initialPosition.x;
+            let y = initialPosition.y;
 
             let velX = 0;
             let velY = 0;
@@ -554,6 +631,7 @@
 
             // TODO: enable scrolling
             // TODO: enable touch interactions
+            foreground.style.transform = `translateX(${x}px) translateY(${y}px)`;
 
             background.addEventListener("mousedown", (e) => {
                 isDown = true;
@@ -642,7 +720,7 @@
             };
         }
 
-        function createPannable(children) {
+        function createPannable(children, initialPosition) {
             const foreground = createElement("div", {
                 className: "pannable-foreground",
                 style: {
@@ -659,8 +737,42 @@
                 },
             }, foreground);
 
-            setupPannable(background, foreground);
+            setupPannable(background, foreground, initialPosition);
             return background;
+        }
+
+        function getGraphBounds(graph) {
+            const bounds = {
+                minX: Infinity,
+                minY: Infinity,
+            };
+
+            for (const block of graph.basic_blocks) {
+                bounds.minX = Math.min(bounds.minX, block.rect.left);
+                bounds.minY = Math.min(bounds.minY, block.rect.top);
+            }
+
+            for (const edge of graph.edges) {
+                for (const point of edge.points) {
+                    bounds.minX = Math.min(bounds.minX, point.x);
+                    bounds.minY = Math.min(bounds.minY, point.y);
+                }
+            }
+
+            if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minY)) {
+                return {minX: 0, minY: 0};
+            }
+
+            return bounds;
+        }
+
+        function getInitialGraphPosition(graph) {
+            const padding = 24;
+            const bounds = getGraphBounds(graph);
+            return {
+                x: Math.max(0, padding - bounds.minX),
+                y: Math.max(0, padding - bounds.minY),
+            };
         }
 
         function renderGraph(graph) {
@@ -689,7 +801,7 @@
                     height: "100%",
                     width: "100%",
                 },
-            }, createPannable(children));
+            }, createPannable(children, getInitialGraphPosition(graph)));
         }
 
         function renderApp(graph) {
@@ -761,6 +873,8 @@
             // even when using different fonts.
             //
             // another hack: assume the graph is rendered within 16ms.
+            fixupFontSize();
+            fixupLineHeight();
             setTimeout(fixupFontSize, 16);
             setTimeout(fixupLineHeight, 16);
         }

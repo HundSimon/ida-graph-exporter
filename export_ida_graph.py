@@ -312,6 +312,7 @@ class Point:
 class Edge:
     # often broken
     color: Color
+    edge_type: str
     points: List[Point]
 
 
@@ -350,6 +351,20 @@ def export_locations(start, end):
         ))
 
     return locations
+
+
+def classify_edge(basic_block: ida_gdl.BasicBlock, succ: ida_gdl.BasicBlock, successors: List[ida_gdl.BasicBlock]) -> str:
+    if len(successors) != 2:
+        return "normal"
+
+    fallthrough_successors = [successor for successor in successors if successor.start_ea == basic_block.end_ea]
+    if len(fallthrough_successors) != 1:
+        return "normal"
+
+    if succ == fallthrough_successors[0]:
+        return "false"
+
+    return "true"
 
 
 def export_current_graph():
@@ -410,7 +425,8 @@ def export_current_graph():
             frame_color=Color.from_int(info.frame_color),
         ))
 
-        for succ in basic_block.succs():
+        successors = list(basic_block.succs())
+        for succ in successors:
             j = succ.id
             edge_spec = ida_graph.edge_t(i, j)
             edge = g.get_edge(edge_spec)
@@ -441,6 +457,7 @@ def export_current_graph():
                 # i debugged IDA and confirmed these values are what's stored in the edge_info_t struct in memory,
                 # its not a python binding issue.
                 color=Color.from_int(edge.color),
+                edge_type=classify_edge(basic_block, succ, successors),
                 points=points,
             ))
 
