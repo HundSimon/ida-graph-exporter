@@ -3,6 +3,7 @@ import pathlib
 import logging
 import binascii
 import dataclasses
+import re
 from typing import List
 from dataclasses import dataclass
 
@@ -18,6 +19,13 @@ import idautils
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+def sanitize_filename(name: str) -> str:
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name)
+    name = re.sub(r"\s+", "_", name)
+    name = name.strip("._ ")
+    return name
 
 
 class Address(str):
@@ -320,6 +328,7 @@ class Edge:
 class Graph:
     sha256: str
     address: Address
+    name: str
     basic_blocks: List[BasicBlock]
     edges: List[Edge]
 
@@ -392,6 +401,7 @@ def export_current_graph():
     graph: Graph = Graph(
         sha256=binascii.hexlify(ida_nalt.retrieve_input_file_sha256()).decode("ascii"),
         address=Address.from_int(va),
+        name=ida_name.get_name(f.start_ea) or f"sub_{f.start_ea:X}",
         basic_blocks=[], 
         edges=[]
     )
@@ -477,7 +487,11 @@ def do_export_current_graph():
 
     doc = json.dumps(graph, cls=DataclassJSONEncoder, indent=2, sort_keys=True)
 
-    default_filename = f"{graph.sha256}_{graph.address}.html"
+    function_name = sanitize_filename(graph.name)
+    if not function_name:
+        function_name = str(graph.address)
+
+    default_filename = f"{function_name}.html"
     path = ida_kernwin.ask_file(True, default_filename, "HTML file to save graph")
     if not path:
         print(doc)
