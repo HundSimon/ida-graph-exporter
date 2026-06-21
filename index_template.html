@@ -68,8 +68,11 @@
 
             /* 20 from my desktop monitor */
             /* 16 from my laptop monitor */
-            font-family: monospace;
+            font-family: "DejaVu Sans Mono", "Consolas", "Menlo", "Liberation Mono", monospace;
             font-size: var(--graph-font-size, 24px);
+            font-weight: 600;
+            -moz-osx-font-smoothing: grayscale;
+            -webkit-font-smoothing: antialiased;
             /* way too big */
             line-height: var(--graph-line-height, 2.0);
         }
@@ -79,7 +82,7 @@
             margin: -1px;
             border: 1px solid black;
             background-color: #252525;
-            box-shadow: 3px 3px 2px rgba(0, 0, 0, 0.35);
+            box-shadow: 4px 4px 2px rgba(0, 0, 0, 0.28);
             color: #d8d8d8;
             overflow: hidden;
         }
@@ -97,8 +100,9 @@
             width: 100%;
         }
 
-        .disassembly-line :first-child {
-          margin-left: 3px;
+        .disassembly-line pre {
+            font: inherit;
+            margin-left: 3px;
         }
 
         .disassembly-line * .token-address {
@@ -528,9 +532,9 @@
         }
 
         const EDGE_COLORS = {
-            normal: "#0000ff",
-            true: "#008000",
-            false: "#ff0000",
+            normal: "#1f58ff",
+            true: "#2aa02a",
+            false: "#d00000",
         };
 
         const LEGACY_EDGE_COLOR_TYPES = {
