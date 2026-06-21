@@ -58,7 +58,7 @@
 
     <style>
         body {
-            background-color: rgb(225, 240, 245);
+            background-color: rgb(176, 176, 176);
             overflow: hidden;
         }
 
@@ -77,15 +77,51 @@
         .basic-block {
             position: fixed;
             margin: -1px;
-            border: 1px solid darkgrey;
-            background-color: white;
-            box-shadow: 1px 1px 3px #888888;
+            border: 1px solid black;
+            background-color: #252525;
+            box-shadow: 3px 3px 2px rgba(0, 0, 0, 0.35);
+            color: #d8d8d8;
+            overflow: hidden;
         }
 
         .basic-block .basic-block-header {
             height: 20px;
             width: 100%;
-            border-bottom: 1px solid darkgrey;
+            border-bottom: 1px solid black;
+            background-color: #efefef;
+            position: relative;
+        }
+
+        .basic-block .basic-block-header::before {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 7px 5px, #25c050 0 3px, transparent 4px),
+                radial-gradient(circle at 11px 10px, #2e6fff 0 3px, transparent 4px),
+                radial-gradient(circle at 4px 11px, #e43a37 0 3px, transparent 4px),
+                radial-gradient(circle at 8px 8px, transparent 0 7px, #111 7px 8px, transparent 8px);
+            background-repeat: no-repeat;
+        }
+
+        .basic-block .basic-block-header::after {
+            content: "";
+            position: absolute;
+            left: 25px;
+            top: 3px;
+            width: 33px;
+            height: 14px;
+            background:
+                linear-gradient(135deg, transparent 0 45%, #d69a2d 45% 62%, transparent 62%) 0 0 / 14px 14px,
+                linear-gradient(#ffffff, #ffffff) 0 0 / 14px 14px,
+                linear-gradient(#1e84b5, #1e84b5) 21px 3px / 10px 2px,
+                linear-gradient(135deg, transparent 0 45%, #777 45% 58%, transparent 58%) 20px 0 / 13px 13px,
+                linear-gradient(#ffffff, #ffffff) 20px 0 / 13px 13px;
+            background-repeat: no-repeat;
         }
 
 
@@ -100,6 +136,7 @@
 
         .disassembly-line * .token-address {
             text-decoration: none;
+            color: var(--COLOR_CODNAME);
         }
 
         svg.edge-line {
@@ -178,45 +215,45 @@
         const DEFAULT_CLR = `
             [DISASM]
             000000	 //
-            ff0000	 //Default color
-            ff0000	 //Regular comment
-            808080	 //Repeatable comment
-            808080	 //Automatic comment
-            800000	 //Instruction
-            800000	 //Dummy Data Name
-            ff0000	 //Regular Data Name
-            ff0000	 //Demangled Name
-            800000	 //Punctuation
-            008000	 //Char constant in instruction
-            00ff00	 //String constant in instruction
-            008000	 //Numeric constant in instruction
-            0080ff	 //Void operand
-            008000	 //Code reference
-            ff8080	 //Data reference
-            0000ff	 //Code reference to tail byte
-            008080	 //Data reference to tail byte
-            010101	 //Error or problem
-            c0c0c0	 //Line prefix
-            ff0000	 //Binary line prefix bytes
-            ff0000	 //Extra line
-            ff0000	 //Alternative operand
-            808080	 //Hidden name
-            ff8080	 //Library function name
-            008000	 //Local variable name
-            800000	 //Dummy code name
-            ff0000	 //Assembler directive
-            800080	 //Macro
-            008000	 //String constant in data directive
-            008000	 //Char constant in data directive
-            408000	 //Numeric constant in data directive
-            800000	 //Keywords
-            800000	 //Register name
-            ff00ff	 //Imported name
-            008080	 //Segment name
-            800000	 //Dummy unknown name
-            ff0000	 //Regular code name
-            800000	 //Regular unknown name
-            ff0000	 //Collapsed line
+            d8d8d8	 //Default color
+            707070	 //Regular comment
+            707070	 //Repeatable comment
+            707070	 //Automatic comment
+            e6e6e6	 //Instruction
+            00d2ff	 //Dummy Data Name
+            00d2ff	 //Regular Data Name
+            00d2ff	 //Demangled Name
+            c8c8c8	 //Punctuation
+            3a6aff	 //Char constant in instruction
+            75d475	 //String constant in instruction
+            3a6aff	 //Numeric constant in instruction
+            b8b866	 //Void operand
+            00d2ff	 //Code reference
+            b8b866	 //Data reference
+            00d2ff	 //Code reference to tail byte
+            b8b866	 //Data reference to tail byte
+            4040ff	 //Error or problem
+            707070	 //Line prefix
+            909090	 //Binary line prefix bytes
+            707070	 //Extra line
+            3a6aff	 //Alternative operand
+            707070	 //Hidden name
+            00d2ff	 //Library function name
+            b8b866	 //Local variable name
+            00d2ff	 //Dummy code name
+            707070	 //Assembler directive
+            80b0ff	 //Macro
+            75d475	 //String constant in data directive
+            3a6aff	 //Char constant in data directive
+            3a6aff	 //Numeric constant in data directive
+            e6e6e6	 //Keywords
+            b8b866	 //Register name
+            b880ff	 //Imported name
+            b8b866	 //Segment name
+            00d2ff	 //Dummy unknown name
+            00d2ff	 //Regular code name
+            00d2ff	 //Regular unknown name
+            707070	 //Collapsed line
             000000	 //Max color number
             ffffff	 //Line prefix: library function
             afbbc0	 //Line prefix: regular function
