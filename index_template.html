@@ -629,6 +629,7 @@
             // this is updated when a drag completes.
             let x = initialPosition.x;
             let y = initialPosition.y;
+            let scale = 1;
 
             let velX = 0;
             let velY = 0;
@@ -637,9 +638,20 @@
             let lastX = 0;
             let lastY = 0;
 
-            // TODO: enable scrolling
             // TODO: enable touch interactions
-            foreground.style.transform = `translateX(${x}px) translateY(${y}px)`;
+            function getTransform(nextX = x, nextY = y, nextScale = scale) {
+                return `translateX(${nextX}px) translateY(${nextY}px) scale(${nextScale})`;
+            }
+
+            function updatePosition(nextX = x, nextY = y, nextScale = scale) {
+                x = nextX;
+                y = nextY;
+                scale = nextScale;
+                foreground.style.transform = getTransform();
+            }
+
+            foreground.style.transformOrigin = "0 0";
+            updatePosition();
 
             background.addEventListener("mousedown", (e) => {
                 isDown = true;
@@ -692,7 +704,7 @@
                 const dx = e.pageX - startX;
                 const dy = e.pageY - startY;
 
-                foreground.style.transform = `translateX(${x + dx}px) translateY(${y + dy}px)`;
+                foreground.style.transform = getTransform(x + dx, y + dy);
 
                 velX = e.pageX - lastX;
                 velY = e.pageY - lastY;
@@ -700,6 +712,52 @@
                 lastX = e.pageX;
                 lastY = e.pageY;
             });
+
+            function normalizeWheelDelta(value, deltaMode, pageSize) {
+                if (deltaMode === WheelEvent.DOM_DELTA_LINE) {
+                    return value * 32;
+                }
+
+                if (deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+                    return value * pageSize;
+                }
+
+                return value;
+            }
+
+            function clamp(value, min, max) {
+                return Math.min(max, Math.max(min, value));
+            }
+
+            background.addEventListener("wheel", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cancelMomentumTracking();
+                velX = 0;
+                velY = 0;
+
+                const wheelX = normalizeWheelDelta(e.deltaX, e.deltaMode, background.clientWidth);
+                const wheelY = normalizeWheelDelta(e.deltaY, e.deltaMode, background.clientHeight);
+
+                if (e.ctrlKey) {
+                    const nextScale = clamp(scale * Math.exp(-wheelY * 0.001), 0.25, 4);
+                    const rect = background.getBoundingClientRect();
+                    const pointerX = e.clientX - rect.left;
+                    const pointerY = e.clientY - rect.top;
+                    const ratio = nextScale / scale;
+
+                    updatePosition(
+                        pointerX - (pointerX - x) * ratio,
+                        pointerY - (pointerY - y) * ratio,
+                        nextScale,
+                    );
+                    return;
+                }
+
+                const dx = e.shiftKey ? -wheelY : -wheelX;
+                const dy = e.shiftKey ? -wheelX : -wheelY;
+                updatePosition(x + dx, y + dy);
+            }, {passive: false});
 
             // Momentum
 
@@ -714,10 +772,7 @@
             }
 
             const momentumLoop = () => {
-                x += velX;
-                y += velY;
-
-                foreground.style.transform = `translateX(${x}px) translateY(${y}px)`;
+                updatePosition(x + velX, y + velY);
 
                 velX *= 0.9;
                 velY *= 0.9;
